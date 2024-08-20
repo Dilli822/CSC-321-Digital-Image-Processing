@@ -2,7 +2,8 @@ import numpy as np
 import cv2
 
 # Path to the text file containing the binary matrix
-input_file_path = './binary_image_matrix.txt'
+# input_file_path = 'random_matrix.txt'
+input_file_path = 'digit_one_matrix.txt'
 output_image_path = 'reconstructed_image.jpg'
 
 # Read the binary matrix from the text file
