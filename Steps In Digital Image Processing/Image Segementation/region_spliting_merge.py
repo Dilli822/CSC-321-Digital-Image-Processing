@@ -1,86 +1,91 @@
-import numpy as np
-from skimage.segmentation import mark_boundaries
-from skimage.util import img_as_ubyte
-from skimage.measure import regionprops, label
-from skimage.color import label2rgb
+import requests
 import cv2
+import numpy as np
 
-def split_image(image, threshold):
-    """
-    Split the image into quadrants if not homogeneous
+def is_homogeneous(region, threshold):
+    """Check if the region is homogeneous based on the intensity threshold."""
+    min_val, max_val = np.min(region), np.max(region)
+    return (max_val - min_val) <= threshold
+
+def split_and_merge(image, threshold):
+    """Segment the image by recursively splitting and merging regions."""
     
-    :param image: Input image (2D numpy array)
-    :param threshold: Homogeneity threshold
-    :return: List of homogeneous regions
-    """
-    if image.size == 0 or np.max(image) - np.min(image) <= threshold:
-        return [image]
+    def recursive_split(region):
+        rows, cols = region.shape
+        if rows <= 1 or cols <= 1:
+            return np.zeros_like(region, dtype=np.uint8)
+        
+        if is_homogeneous(region, threshold):
+            return np.ones_like(region, dtype=np.uint8)
+        
+        # Split the region into four quadrants
+        mid_row, mid_col = rows // 2, cols // 2
+        
+        # Ensure quadrants are correctly sized
+        top_left = region[:mid_row, :mid_col]
+        top_right = region[:mid_row, mid_col:]
+        bottom_left = region[mid_row:, :mid_col]
+        bottom_right = region[mid_row:, mid_col:]
+        
+        # Create empty segmented image of the same size
+        segmented_quadrants = np.zeros_like(region, dtype=np.uint8)
+        
+        # Recursive splitting and assignment to segmented_quadrants
+        segmented_quadrants[:mid_row, :mid_col] = recursive_split(top_left)
+        segmented_quadrants[:mid_row, mid_col:] = recursive_split(top_right)
+        segmented_quadrants[mid_row:, :mid_col] = recursive_split(bottom_left)
+        segmented_quadrants[mid_row:, mid_col:] = recursive_split(bottom_right)
+        
+        return segmented_quadrants
+
+    def merge_regions(segmented):
+        """Merge adjacent regions if they are similar."""
+        # Placeholder function for merging adjacent regions if needed
+        return segmented
+
+    # Ensure the image is grayscale
+    if len(image.shape) == 3:
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     
-    height, width = image.shape
-    mid_h, mid_w = height // 2, width // 2
+    # Apply the region splitting and merging algorithm
+    segmented_image = recursive_split(image)
+    segmented_image = merge_regions(segmented_image)
     
-    top_left = split_image(image[:mid_h, :mid_w], threshold)
-    top_right = split_image(image[:mid_h, mid_w:], threshold)
-    bottom_left = split_image(image[mid_h:, :mid_w], threshold)
-    bottom_right = split_image(image[mid_h:, mid_w:], threshold)
+    return segmented_image
+
+def main():
+    # Load the image
+    # url = 'https://www.experian.com/blogs/news/wp-content/uploads/2012/06/cars.png'  # Replace with your image URL
+    # file_path = 'R.png'  # Fallback file path
+    # url = None
+    file_path = None
+    url = "https://cdn.mos.cms.futurecdn.net/r6VkfLP3F2zbrWXdgeDis.jpg"
     
-    return top_left + top_right + bottom_left + bottom_right
-
-def merge_regions(image, regions, threshold):
-    """
-    Merge adjacent similar regions
+    try:
+        # Try loading the image from URL
+        response = requests.get(url)
+        response.raise_for_status()
+        image = np.asarray(bytearray(response.content), dtype=np.uint8)
+        image = cv2.imdecode(image, cv2.IMREAD_GRAYSCALE)
+    except:
+        # Fallback to loading image from file
+        image = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
     
-    :param image: Original image
-    :param regions: List of regions
-    :param threshold: Similarity threshold for merging
-    :return: Segmented image
-    """
-    segmented = np.zeros_like(image, dtype=int)
-    label_counter = 1
+    if image is None:
+        print("Error loading image.")
+        return
 
-    for region in regions:
-        if region.size > 0:  # Only process non-empty regions
-            y, x = np.unravel_index(np.argmin(np.abs(image - region[0, 0])), image.shape)
-            h, w = region.shape
-            segmented[y:y+h, x:x+w] = label_counter
-            label_counter += 1
+    # Set the threshold for homogeneity
+    threshold = 3  # Adjust this value as needed
 
-    changed = True
-    while changed:
-        changed = False
-        props = regionprops(segmented)
-        for prop in props:
-            for neighbor in props:
-                if prop.label != neighbor.label:
-                    if abs(np.mean(image[segmented == prop.label]) - np.mean(image[segmented == neighbor.label])) <= threshold:
-                        segmented[segmented == neighbor.label] = prop.label
-                        changed = True
-                        break
-            if changed:
-                break
+    # Segment the image
+    result = split_and_merge(image, threshold)
 
-    return segmented
+    # Save and display the segmented image
+    cv2.imwrite('sImsegmented_image.png', result * 255)
+    cv2.imshow('Segmented Image', result * 255)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
-def split_and_merge(image, split_threshold, merge_threshold):
-    """
-    Perform split-and-merge segmentation
-    
-    :param image: Input image (2D numpy array)
-    :param split_threshold: Threshold for splitting
-    :param merge_threshold: Threshold for merging
-    :return: Segmented image
-    """
-    regions = split_image(image, split_threshold)
-    segmented = merge_regions(image, regions, merge_threshold)
-    
-    return segmented
-
-# Example usage:
-image = cv2.imread('Kirat_King_(_Yalamber_)_Sankhuwasabha,_Nepal.jpg', 0)  # Read as grayscale
-split_threshold = 20
-merge_threshold = 10
-result = split_and_merge(image, split_threshold, merge_threshold)
-
-# Visualize the result
-colored_result = label2rgb(result, image=image, bg_label=0)
-cv2.imwrite('segmented.png', img_as_ubyte(colored_result))
+if __name__ == "__main__":
+    main()
