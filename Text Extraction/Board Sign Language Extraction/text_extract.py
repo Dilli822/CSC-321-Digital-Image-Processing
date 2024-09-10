@@ -63,7 +63,8 @@ def extract_text_from_image(image_source):
 # image_path = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSqaojtloJPbvWJWeFWDBOomUpKlVqAZz5Z4Q&s' 
 # image_path = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR9QUEaLpQIRATe9BGVToaBlmeBPHynZa_wHw&s'
 # image_path = 'https://www.clipartmax.com/png/middle/195-1950892_restroom-sign-japan-japanese-sign-in-japan.png'
-image_path = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQpb_WfGGU7aPQv17kqRtXEIm3uwctMepYIBA&s'
+# image_path = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQpb_WfGGU7aPQv17kqRtXEIm3uwctMepYIBA&s'
+image_path = './ll.png'
 extracted_text = extract_text_from_image(image_path)
 
 
