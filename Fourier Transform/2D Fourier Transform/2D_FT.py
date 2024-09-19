@@ -1,59 +1,56 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from skimage import data
+from urllib.request import urlopen
+from PIL import Image
+import io
 
-# Load the built-in grayscale image
-image = data.camera()
+def load_image_from_url(url):
+    with urlopen(url) as response:
+        image_data = response.read()
+    img = Image.open(io.BytesIO(image_data)).convert('L')  # Convert to grayscale
+    return np.array(img)
 
-# Apply 2D Fourier Transform
-F = np.fft.fft2(image)
-Fshift = np.fft.fftshift(F)  # Shift the zero frequency component to the center
+def manual_2d_fourier_transform(image):
+    M, N = image.shape
+    F = np.zeros((M, N), dtype=complex)
+    
+    x = np.arange(M).reshape(-1, 1)
+    y = np.arange(N)
+    
+    for u in range(M):
+        for v in range(N):
+            e = np.exp(-2j * np.pi * ((u * x / M) + (v * y / N)))
+            F[u, v] = np.sum(image * e)
+    
+    return F
 
-# Calculate the different components
-real_part = np.real(Fshift)
-imaginary_part = np.imag(Fshift)
-magnitude_spectrum = np.log(np.abs(Fshift) + 1)  # Magnitude spectrum
-phase_spectrum = np.angle(Fshift)  # Phase spectrum
+def magnitude_spectrum(F):
+    return np.fft.fftshift(np.abs(F))
 
-# Plot the original image and the Fourier Transform components
-plt.figure(figsize=(12, 10))
+def visualize_results(image, magnitude_spectrum):
+    plt.figure(figsize=(12, 6))
+    
+    plt.subplot(1, 2, 1)
+    plt.imshow(image, cmap='gray')
+    plt.title("Original Image")
+    plt.axis("off")
+    
+    plt.subplot(1, 2, 2)
+    plt.imshow(np.log1p(magnitude_spectrum), cmap='viridis')
+    plt.title("Magnitude Spectrum (Log Scale)")
+    plt.axis("off")
+    
+    plt.tight_layout()
+    plt.show()
 
-# Plot the original image
-plt.subplot(2, 3, 1)
-plt.imshow(image, cmap='gray')
-plt.title('Original Image')
-plt.axis('off')
+def main():
+    image_url = 'https://unsplash.it/250'
+    
+    image = load_image_from_url(image_url)
+    F = manual_2d_fourier_transform(image)
+    magnitude = magnitude_spectrum(F)
+    visualize_results(image, magnitude)
 
-# Plot the real part of the Fourier Transform
-plt.subplot(2, 3, 2)
-plt.imshow(real_part, cmap='gray')
-plt.title('Real Part')
-plt.axis('off')
+if __name__ == "__main__":
+    main()
 
-# Plot the imaginary part of the Fourier Transform
-plt.subplot(2, 3, 3)
-plt.imshow(imaginary_part, cmap='gray')
-plt.title('Imaginary Part')
-plt.axis('off')
-
-# Plot the magnitude spectrum
-plt.subplot(2, 3, 4)
-plt.imshow(magnitude_spectrum, cmap='gray')
-plt.title('Magnitude Spectrum')
-plt.axis('off')
-
-# Plot the phase spectrum
-plt.subplot(2, 3, 5)
-plt.imshow(phase_spectrum, cmap='gray')
-plt.title('Phase Spectrum')
-plt.axis('off')
-
-# Plot a combined log-magnitude and phase
-plt.subplot(2, 3, 6)
-combined_image = np.log(np.abs(Fshift)) * np.angle(Fshift)
-plt.imshow(combined_image, cmap='gray')
-plt.title('Log Magnitude * Phase')
-plt.axis('off')
-
-plt.tight_layout()
-plt.show()
